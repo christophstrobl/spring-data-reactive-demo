@@ -30,9 +30,13 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.CollectionOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.repository.Tailable;
 import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRepositories;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,9 +49,12 @@ public class DemoApplication implements CommandLineRunner {
 	}
 
 	@Autowired PersonRepository repository;
+	@Autowired MongoTemplate template;
 
 	@Override
 	public void run(String... args) throws Exception {
+
+		template.createCollection(Person.class, new CollectionOptions(1000, 1000, true));
 
 		String[] names = { "Eddard", "Catelyn", "Jon", "Rob", "Sansa", "Aria", "Bran", "Rickon" };
 
@@ -81,7 +88,10 @@ public class DemoApplication implements CommandLineRunner {
 			return repository.findByName(name);
 		}
 
-		// TODO: It would be really cool if we could just stream the data!
+		@GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE) /* curl localhost:8080/stream */
+		Flux<Person> streamPersons() {
+			return repository.findBy();
+		}
 	}
 
 	interface PersonRepository extends ReactiveCrudRepository<Person, String> {
@@ -89,6 +99,9 @@ public class DemoApplication implements CommandLineRunner {
 		Flux<Person> findAllByName(String name);
 
 		Observable<Person> findByName(String name);
+
+		@Tailable
+		Flux<Person> findBy();
 	}
 
 	@Document
